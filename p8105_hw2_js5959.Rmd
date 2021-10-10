@@ -111,7 +111,7 @@ The finial res_dt dataset includes all three parts above.There are indicator of 
 ## Problem3
 
 ### A basic data cleaning with notes in questions
-```{r echo=FALSE}
+```{r echo = T, results = 'hide'}
 #According to the note, we need to specify the ethnicity name and control the case of names.
 
 pop_names_dt = read_csv("Popular_Baby_Names.csv") %>% 
@@ -122,6 +122,8 @@ pop_names_dt = read_csv("Popular_Baby_Names.csv") %>%
   ) %>% distinct()# remove duplicated rows
   
 ```
+There are `r nrow(pop_names_dt)` entries after remove duplicated rows.
+
 ### female named with olivia
 ```{r}
 olivia_female_dt = pop_names_dt %>% 
