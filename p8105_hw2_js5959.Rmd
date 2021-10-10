@@ -1,0 +1,155 @@
+---
+title: "p8105_hw2_js5959"
+author: "Junzhe Shao"
+date: "10/9/2021"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(readxl)
+library(tidyverse)
+library(lubridate)
+library(ggrepel)
+```
+
+
+## Problem 1
+### read excel sheet "Mr. Trash Wheel" and do the data cleaning
+```{r warning = FALSE}
+#read excel sheet "Mr. Trash Wheel" and do the data cleaning
+mr_tw_dt = read_excel("Trash-Wheel-Collection-Totals-7-2020-2.xlsx", sheet = "Mr. Trash Wheel", skip = 1) %>% 
+  janitor::clean_names() %>% 
+  select(-c(x15,x16,x17)) %>% # remove extra columns
+  filter(dumpster != "Grand Total") %>% 
+  drop_na(dumpster) %>% 
+  mutate(
+    sports_balls = round(sports_balls)
+  )
+#display first ten rows 
+kable(mr_tw_dt[1:10,])
+```
+### clean precipitation for 2018 and 2019
+```{r warning = FALSE}
+# clean precipitation for 2018 and 2019
+pr_19_dt = read_excel("Trash-Wheel-Collection-Totals-7-2020-2.xlsx", sheet = "2019 Precipitation", skip = 1) %>% 
+  janitor::clean_names() %>% 
+  drop_na(month) %>% 
+  mutate(
+    month = month.name[month],
+    year = 2019)
+pr_18_dt = read_excel("Trash-Wheel-Collection-Totals-7-2020-2.xlsx", sheet = "2018 Precipitation", skip = 1) %>% 
+  janitor::clean_names() %>% 
+  drop_na(month) %>% 
+  mutate(
+    month = month.name[month],
+    year = 2018)
+pr_dt = bind_rows(pr_19_dt,pr_18_dt)
+kable(pr_dt)
+```
+### A description of both resulting datasets:
+observation of cleaned Mr. Trash Wheel data is 453, variables in that dataset indicating the a summary of date, total amount of trash collected and their specific types.
+observation of combined 2018 and 2019 Precipitation data is 24 month. The total Precipitation of 2018 is `r pr_dt %>% filter(year == 2018) %>% pull(total) %>% sum()`
+the medium number of sports balls in a dumpster in 2019 is `r mr_tw_dt %>% filter(year == 2019) %>% pull(sports_balls) %>% median()`
+
+## Problem 2
+### clean the data in pols-month.csv.
+```{r warning = FALSE}
+pols_month_dt = read_csv("./fivethirtyeight_datasets/pols-month.csv") %>% 
+  separate(mon,c("year","month","day")) %>% 
+  mutate(
+    month = month.name[as.numeric(month)],
+    president = ifelse(prez_gop == 0, "dem","gop")# replace 0 with dem 
+  ) %>% 
+  select(-c(prez_dem,prez_gop,day))#remove columns
+#display first ten rows
+kable(pols_month_dt[1:10,])
+```
+### clean snp.csv 
+```{r warning = FALSE}
+snp_dt = read_csv("./fivethirtyeight_datasets/snp.csv") %>% 
+  mutate(
+    date = mdy(date)
+  ) %>% 
+  separate(date,c("year","month","day")) %>% 
+  mutate(
+    month = month.name[as.numeric(month)],
+    year = as.numeric(year),
+    year = ifelse(year > 2021,year-100,year),
+    year = as.character(year)
+  ) %>% 
+  select(-day)
+kable(snp_dt[1:10,])    
+```
+### clean unemployment data
+```{r}
+unemp_dt = read_csv("./fivethirtyeight_datasets/unemployment.csv") %>% 
+    pivot_longer(
+      Jan:Dec,
+      names_to = "month", 
+      values_to = "percentage_unemployment") %>% 
+    mutate(date = str_c(Year, month, sep = "-"),
+           date= ym(date)) %>% 
+  separate(date, c("year", "month","day")) %>% 
+  mutate(
+    month = month.name[as.numeric(month)]
+  ) %>% 
+  select(-c(day,Year))
+kable(unemp_dt[1:10,])
+```
+```{r}
+res_dt <- left_join(pols_month_dt, snp_dt,by =c("year"="year","month"="month"),na_matches="never")
+res_dt <- left_join(res_dt, unemp_dt,by =c("year"="year","month"="month"),na_matches="never") %>% 
+  arrange(year,month)# arrange by order of date
+kable(res_dt[1:10,])
+```
+### A bref discription
+
+The finial res_dt dataset includes all three parts above.There are indicator of whether the president was republican/democratic, the number of republican/democratic governors/representatives/senators,closing values of the S&P stock index and the unemployment rate and variables indicating date.  
+
+## Problem3
+
+### A basic data cleaning with notes in questions
+```{r echo=FALSE}
+#According to the note, we need to specify the ethnicity name and control the case of names.
+
+pop_names_dt = read_csv("Popular_Baby_Names.csv") %>% 
+  janitor::clean_names()%>% 
+    separate(ethnicity, "ethinic", extra = "drop") %>% # ethinic dupicated remove
+  mutate(
+    childs_first_name = tolower(childs_first_name)# lower case
+  ) %>% distinct()# remove duplicated rows
+  
+```
+### female named with olivia
+```{r}
+olivia_female_dt = pop_names_dt %>% 
+  filter(childs_first_name == "olivia",gender == "FEMALE") %>% 
+  select(-c(childs_first_name,gender,count)) %>% 
+  pivot_wider(
+    names_from = "year_of_birth",
+    values_from = "rank")
+kable(olivia_female_dt)
+```
+### The most popluar male man trending for all years
+```{r}
+pop_male_name = pop_names_dt %>% 
+  filter(rank == 1,gender == "MALE") %>% 
+  select(-c(rank,gender,count)) %>% 
+  pivot_wider(
+    names_from = "year_of_birth",
+    values_from = "childs_first_name"
+  )
+kable(pop_male_name)
+```
+### scatter plot for white male in 2016:
+```{r}
+male_white_2016 = pop_names_dt %>% 
+  filter(gender == "MALE",ethinic == "WHITE",year_of_birth == 2016) 
+
+ggplot(male_white_2016, aes(x = rank, y = count)) +geom_point(colour = "skyblue") +geom_text_repel(label = male_white_2016$childs_first_name)# add not overlapping labels
+```
+
+
+
